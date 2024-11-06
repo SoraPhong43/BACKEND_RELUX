@@ -17,6 +17,7 @@ const {
   getServices5star,
   ServiceDiscount,
   NewService,
+  getServiceById,
 } = require("../controllers/serviceController");
 
 const { deleteCategory } = require("../controllers/categoryController");
@@ -41,6 +42,7 @@ router.post("/services/service5star", getServices5star);
 router.post("/services/sericediscount", ServiceDiscount);
 router.post("/services/newservice", NewService);
 
+router.get("/services/:serviceId", getServiceById);
 //category
-router.delete("/categories/:id", deleteCategory);
+router.delete("/categories/:serviceId", deleteCategory);
 module.exports = router;

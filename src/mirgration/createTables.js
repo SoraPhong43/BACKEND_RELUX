@@ -1,12 +1,15 @@
 const createUsersTable = require("../models/users");
 const { createServicesTable } = require("../models/services");
 const createCategoriesTable = require("../models/categories");
+
 const createTables = async () => {
   try {
     console.log("Starting database initialization...");
     await createUsersTable();
     await createCategoriesTable();
     await createServicesTable();
+    // await createMenusTable();
+    // await createMenuItemsTable();
     console.log("Database initialization completed successfully");
   } catch (error) {
     console.error("Database initialization failed:", error);
