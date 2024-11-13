@@ -19,9 +19,11 @@ const {
   NewService,
   getServiceById,
 } = require("../controllers/serviceController");
-
 const { deleteCategory } = require("../controllers/categoryController");
-
+const {
+  getAllLocations,
+  getSpaWithEmployees,
+} = require("../controllers/locationController");
 const router = express.Router();
 
 router.post("/auth/login", login);
@@ -45,4 +47,7 @@ router.post("/services/newservice", NewService);
 router.get("/services/:serviceId", getServiceById);
 //category
 router.delete("/categories/:serviceId", deleteCategory);
+//location
+router.get("/location", getAllLocations);
+router.get("/location/geteinspa", getSpaWithEmployees);
 module.exports = router;
