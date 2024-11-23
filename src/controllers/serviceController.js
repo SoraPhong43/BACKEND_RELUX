@@ -193,25 +193,28 @@ const NewService = async (req, res) => {
 //     return res.status(500).json({ message: "Internal server error." });
 //   }
 // };
+const executeQuery = (query, params) => {
+  return new Promise((resolve, reject) => {
+    connection.query(query, params, (err, results) => {
+      if (err) {
+        return reject(err);
+      }
+      resolve(results);
+    });
+  });
+};
+
 const getServiceById = async (req, res) => {
   try {
     const serviceId = req.params.serviceId;
     console.log("Requested serviceId:", serviceId);
 
     const serviceQuery = `
-        SELECT serviceId AS id, serviceName AS name, description, price, image, rating, discount, isNew
-        FROM services
-        WHERE serviceId = ?
-      `;
-    const services = await new Promise((resolve, reject) => {
-      connection.query(serviceQuery, [serviceId], (err, results) => {
-        if (err) {
-          console.error("Error fetching service:", err);
-          reject(err);
-        }
-        resolve(results);
-      });
-    });
+      SELECT serviceId AS id, serviceName AS name, description, price, image, rating, discount, isNew
+      FROM services
+      WHERE serviceId = ?
+    `;
+    const services = await executeQuery(serviceQuery, [serviceId]);
 
     if (services.length === 0) {
       return res
@@ -231,93 +234,87 @@ const getServiceById = async (req, res) => {
     };
 
     const menuQuery = `SELECT id, name, description FROM menus WHERE serviceId = ?`;
-    const menus = await new Promise((resolve, reject) => {
-      connection.query(menuQuery, [serviceId], (err, results) => {
-        if (err) {
-          console.error("Error fetching menus:", err);
-          reject(err);
-        }
-        resolve(results);
-      });
-    });
+    const menus = await executeQuery(menuQuery, [serviceId]);
 
     for (const menu of menus) {
-      const menuItemQuery = `
-        SELECT 
-          id, 
-          itemName AS name, 
-          itemPrice AS price, 
-          itemDescription AS description,
-          createdAt, 
-          updatedAt,
-          details
-        FROM menu_items 
-        WHERE menuId = ?
-      `;
-      const menuItems = await new Promise((resolve, reject) => {
-        connection.query(menuItemQuery, [menu.id], (err, results) => {
-          if (err) {
-            console.error("Error fetching menu items:", err);
-            reject(err);
-          }
-          resolve(results);
-        });
-      });
-
-      // Lấy options cho từng menuItem và gán vào menuItems
-      for (const item of menuItems) {
-        const optionQuery = `
+      try {
+        const menuItemQuery = `
           SELECT 
-            id AS optionId, 
-            title, 
-            description, 
-            additionalPrice 
-          FROM options 
-          WHERE menuItemId = ?
+            id, 
+            itemName AS name, 
+            itemPrice AS price, 
+            itemDescription AS description,
+            createdAt, 
+            updatedAt,
+            details,
+            status, 
+            totalAmount,
+            duration -- Thêm thuộc tính duration
+          FROM menu_items 
+          WHERE menuId = ?
         `;
-        const options = await new Promise((resolve, reject) => {
-          connection.query(optionQuery, [item.id], (err, results) => {
-            if (err) {
-              console.error("Error fetching options:", err);
-              reject(err);
+        const menuItems = await executeQuery(menuItemQuery, [menu.id]);
+
+        for (const item of menuItems) {
+          const optionQuery = `
+            SELECT 
+              id AS optionId, 
+              title, 
+              description, 
+              additionalPrice 
+            FROM options 
+            WHERE menuItemId = ?
+          `;
+          const options = await executeQuery(optionQuery, [item.id]);
+
+          item.options = options.map((option) => ({
+            id: option.optionId,
+            title: option.title,
+            description: option.description,
+            additionalPrice: option.additionalPrice,
+          }));
+        }
+
+        menu.menuItems = menuItems.map((item) => ({
+          menuItem: menu.id,
+          id: item.id.toString(),
+          name: item.name,
+          price: item.price,
+          description: item.description,
+          duration: item.duration, // Bao gồm thuộc tính duration
+          details: (() => {
+            try {
+              return item.details ? JSON.parse(item.details) : [];
+            } catch (e) {
+              console.error("Error parsing details JSON:", e);
+              return [];
             }
-            resolve(results);
-          });
-        });
-
-        item.options = options.map((option) => ({
-          id: option.optionId,
-          title: option.title,
-          description: option.description,
-          additionalPrice: option.additionalPrice,
+          })(),
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          status: item.status,
+          totalAmount: item.totalAmount,
+          options: item.options,
         }));
+
+        serviceData.menu.push({
+          menu: serviceId,
+          menuId: menu.id,
+          name: menu.name,
+          description: menu.description,
+          menuItems: menu.menuItems,
+        });
+      } catch (error) {
+        console.error("Error processing menu:", error);
       }
-
-      menu.menuItems = menuItems.map((item) => ({
-        menuItem: menu.id,
-        id: item.id.toString(),
-        name: item.name,
-        price: item.price,
-        description: item.description,
-        details: item.details ? JSON.parse(item.details) : [], // parse JSON if details exist
-        createdAt: item.createdAt,
-        updatedAt: item.updatedAt,
-        options: item.options, // Add options to each menu item
-      }));
-
-      serviceData.menu.push({
-        menu: serviceId,
-        menuId: menu.id,
-        name: menu.name,
-        description: menu.description,
-        menuItems: menu.menuItems, // Add the items with complete structure including options
-      });
     }
 
     return res.status(200).json({ data: serviceData });
   } catch (error) {
     console.error("Error in getServiceById:", error);
-    return res.status(500).json({ message: "Internal server error." });
+    return res
+      .status(500)
+      .json({ message: "Internal server error.", error: error.message });
   }
 };
 

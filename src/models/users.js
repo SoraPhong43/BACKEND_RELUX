@@ -59,7 +59,7 @@ const createUsersTable = async () => {
         email VARCHAR(255) NOT NULL UNIQUE,
         phone VARCHAR(15),
         fullname VARCHAR(255),
-        avatar VARCHAR(255) DEFAULT 'default-avatar.png',  // Thêm cột này
+        avatar VARCHAR(255) DEFAULT 'default-avatar.png', 
         code VARCHAR(6),
         code_expired_at TIMESTAMP NULL,
         is_verified BOOLEAN DEFAULT false,

@@ -432,6 +432,98 @@ const uploadAvatar = async (req, res) => {
   }
 };
 
+const patchUserDetails = async (req, res) => {
+  try {
+    const { userId, phone, username } = req.body; // Lấy userId từ body
+
+    // Kiểm tra xem userId có được cung cấp hay không
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Kiểm tra xem người dùng có tồn tại hay không
+    const [userExists] = await new Promise((resolve, reject) => {
+      connection.query(
+        "SELECT * FROM users WHERE userId = ?",
+        [userId],
+        (err, results) => {
+          if (err) reject(err);
+          resolve(results);
+        }
+      );
+    });
+
+    if (!userExists || userExists.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Chỉ cập nhật các trường có trong body
+    const fieldsToUpdate = {};
+    if (phone !== undefined) fieldsToUpdate.phone = phone;
+    if (username !== undefined) fieldsToUpdate.username = username;
+
+    if (Object.keys(fieldsToUpdate).length === 0) {
+      return res.status(400).json({ message: "No fields to update" });
+    }
+
+    const updateQuery = `
+      UPDATE users
+      SET ${Object.keys(fieldsToUpdate)
+        .map((field) => `${field} = ?`)
+        .join(", ")}
+      WHERE userId = ?
+    `;
+    const values = [...Object.values(fieldsToUpdate), userId];
+
+    console.log("Update Query:", updateQuery);
+    console.log("Update Values:", values);
+
+    const result = await new Promise((resolve, reject) => {
+      connection.query(updateQuery, values, (err, result) => {
+        if (err) {
+          reject(err);
+        }
+        console.log("Update Result:", result); // Log ngay sau khi truy vấn thành công
+        resolve(result);
+      });
+    });
+
+    if (result.affectedRows === 0) {
+      return res.status(400).json({ message: "Failed to update user details" });
+    }
+
+    // Lấy lại thông tin người dùng sau khi cập nhật
+    const [updatedUser] = await new Promise((resolve, reject) => {
+      connection.query(
+        "SELECT userId, username, phone FROM users WHERE userId = ?",
+        [userId],
+        (err, results) => {
+          if (err) reject(err);
+          resolve(results);
+        }
+      );
+    });
+
+    if (!updatedUser) {
+      return res
+        .status(500)
+        .json({ message: "Failed to retrieve updated user details" });
+    }
+
+    // Trả về thông tin người dùng đã cập nhật
+    res.status(200).json({
+      message: "User details updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error updating user details:", error); // Log chi tiết lỗi
+    res.status(500).json({
+      message: "An error occurred while updating user details",
+      error: error.message || "Unknown error", // Trả về thông tin lỗi cụ thể
+    });
+  }
+};
+
 module.exports = {
   account,
   login,
@@ -439,4 +531,5 @@ module.exports = {
   updateAvatar,
   deleteUser,
   uploadAvatar,
+  patchUserDetails,
 };

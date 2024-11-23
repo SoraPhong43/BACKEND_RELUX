@@ -96,4 +96,35 @@ const getSpaWithEmployees = async (req, res) => {
   }
 };
 
-module.exports = { getAllLocations, getSpaWithEmployees };
+const getLocationByID = async (req, res) => {
+  try {
+    const locationId = req.params.locationID;
+    const locationQuery = `
+    SELECT locationID AS locationID , locationName ,address AS Address,description,image
+    FROM location
+    WHERE locationID=?
+    `;
+    console.log("Location ID:", locationId);
+    console.log("Query:", locationQuery);
+
+    const location = await new Promise((resolve, reject) => {
+      connection.query(locationQuery, [locationId], (err, results) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(results);
+      });
+    });
+
+    if (location.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No location found with this ID" });
+    }
+    return res.status(200).json({ data: location });
+  } catch (error) {
+    console.log("error in location get id:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+module.exports = { getAllLocations, getSpaWithEmployees, getLocationByID };

@@ -1,10 +1,12 @@
 const connection = require("../config/database");
 const createLocationTable = () => {
   const createTableQuery = `
-    CREATE TABLE IF NOT EXISTS locations (
+    CREATE TABLE IF NOT EXISTS location (
       locationID INT AUTO_INCREMENT PRIMARY KEY,
       locationName NVARCHAR(255) NOT NULL,
-      address NVARCHAR(255)
+      address NVARCHAR(255),
+      description TEXT,
+      image VARCHAR(255)
     );
   `;
 
