@@ -7,7 +7,7 @@ const path = require("path");
 const handlebars = require("handlebars");
 const bcrypt = require("bcrypt");
 const multer = require("multer");
-
+const jwt = require("jsonwebtoken");
 // Đọc template email
 const emailTemplate = fs.readFileSync(
   path.join(__dirname, "../templates/verifyCode.hbs"),
@@ -150,7 +150,11 @@ const login = async (req, res) => {
     }
 
     // Generate token (thay thế bằng JWT của bạn)
-    const access_token = "your-jwt-token-here";
+    const access_token = jwt.sign(
+      { id: user.userId, email: user.email },
+      "your-secret-key", // Khớp với middleware `authenticateToken`
+      { expiresIn: "1h" } // Token hết hạn sau 1 giờ
+    );
 
     // Trả về response với avatar mặc định
     return res.status(200).json({
@@ -524,6 +528,123 @@ const patchUserDetails = async (req, res) => {
   }
 };
 
+const updatePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    // Lấy userId từ token
+    const userId = req.user?.id;
+    console.log("Current Password:", currentPassword);
+    console.log("New Password:", newPassword);
+
+    if (!userId) {
+      return res.status(401).json({
+        statusCode: 401,
+        message: "User is not authenticated.",
+        timestamp: Date.now(),
+      });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        statusCode: 400,
+        message: "Missing required fields (currentPassword or newPassword).",
+        timestamp: Date.now(),
+      });
+    }
+
+    // Lấy thông tin user từ database
+    const user = await new Promise((resolve, reject) => {
+      connection.query(
+        "SELECT password FROM users WHERE userId = ?",
+        [userId],
+        (err, results) => {
+          if (err) return reject(err);
+          resolve(results[0]); // Trả về user đầu tiên
+        }
+      );
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        statusCode: 404,
+        message: "User not found.",
+        timestamp: Date.now(),
+      });
+    }
+
+    // Kiểm tra mật khẩu hiện tại
+    if (user.password !== currentPassword) {
+      return res.status(401).json({
+        statusCode: 401,
+        message: "Current password is incorrect.",
+        timestamp: Date.now(),
+      });
+    }
+
+    // Kiểm tra mật khẩu mới không trùng với mật khẩu hiện tại
+    if (currentPassword === newPassword) {
+      return res.status(400).json({
+        statusCode: 400,
+        message: "New password must be different from the current password.",
+        timestamp: Date.now(),
+      });
+    }
+
+    // Cập nhật mật khẩu trực tiếp (không mã hóa)
+    await new Promise((resolve, reject) => {
+      connection.query(
+        "UPDATE users SET password = ? WHERE userId = ?",
+        [newPassword, userId],
+        (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        }
+      );
+    });
+
+    return res.status(200).json({
+      statusCode: 200,
+      message: "Password updated successfully.",
+      data: {
+        userId,
+      },
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    console.error("Error updating password:", error);
+    return res.status(500).json({
+      statusCode: 500,
+      message: "An error occurred while updating the password.",
+      timestamp: Date.now(),
+    });
+  }
+};
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      message: "Access token is missing.",
+    });
+  }
+
+  jwt.verify(token, "your-secret-key", (err, user) => {
+    if (err) {
+      return res.status(403).json({
+        message: "Invalid or expired token.",
+      });
+    }
+
+    req.user = user; // Gắn thông tin user vào req
+    next();
+  });
+  console.log("Authorization Header:", req.headers["authorization"]);
+  console.log("Extracted Token:", token);
+};
+
 module.exports = {
   account,
   login,
@@ -532,4 +653,6 @@ module.exports = {
   deleteUser,
   uploadAvatar,
   patchUserDetails,
+  updatePassword,
+  authenticateToken,
 };

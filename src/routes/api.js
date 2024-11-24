@@ -7,6 +7,8 @@ const {
   deleteUser,
   uploadAvatar,
   patchUserDetails,
+  updatePassword,
+  authenticateToken,
 } = require("../controllers/userController");
 
 const {
@@ -28,6 +30,11 @@ const {
 } = require("../controllers/locationController");
 
 const { booking, getAllBookings } = require("../controllers/bookingController");
+const {
+  geocodeHandler,
+  reverseGeocodeHandler,
+  routeHandler,
+} = require("../controllers/mapController");
 const router = express.Router();
 // user
 router.post("/auth/login", login);
@@ -39,6 +46,8 @@ router.post("/auth/verify-code", verifyCode);
 router.put("/users/:userId/avatar", updateAvatar);
 //edit tt user
 router.patch("/user/edituser", patchUserDetails);
+//cap nhat password
+router.post("/users/password", authenticateToken, updatePassword);
 //xoa user
 router.delete("/users/:id", deleteUser);
 
@@ -60,4 +69,8 @@ router.get("/location/getLocationById/:locationID", getLocationByID);
 //booking
 router.post("/bookings", booking);
 router.get("/bookings/all", getAllBookings);
+//map
+router.get("/geocode", geocodeHandler);
+router.get("/reverse-geocode", reverseGeocodeHandler);
+router.get("/route", routeHandler);
 module.exports = router;
