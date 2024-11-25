@@ -9,6 +9,8 @@ const {
   patchUserDetails,
   updatePassword,
   authenticateToken,
+  sendResetPasswordCode,
+  resetPassword,
 } = require("../controllers/userController");
 
 const {
@@ -48,6 +50,10 @@ router.put("/users/:userId/avatar", updateAvatar);
 router.patch("/user/edituser", patchUserDetails);
 //cap nhat password
 router.post("/users/password", authenticateToken, updatePassword);
+//quen mk
+router.post("/auth/retry-password", sendResetPasswordCode);
+//quen mk->nhap mk
+router.post("/auth/forgot-password", resetPassword);
 //xoa user
 router.delete("/users/:id", deleteUser);
 

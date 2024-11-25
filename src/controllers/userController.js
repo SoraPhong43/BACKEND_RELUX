@@ -13,7 +13,12 @@ const emailTemplate = fs.readFileSync(
   path.join(__dirname, "../templates/verifyCode.hbs"),
   "utf8"
 );
+const forgotPasswordTemplate = fs.readFileSync(
+  path.join(__dirname, "../templates/forgotPassword.hbs"),
+  "utf8"
+);
 const template = handlebars.compile(emailTemplate);
+const compiledTemplate = handlebars.compile(forgotPasswordTemplate);
 const EXPIRY_MINUTES = parseInt(process.env.MAIL_EXPIRE_IN || 5);
 
 // Cấu hình transporter cho Nodemailer
@@ -590,6 +595,7 @@ const updatePassword = async (req, res) => {
         timestamp: Date.now(),
       });
     }
+    //const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
     // Cập nhật mật khẩu trực tiếp (không mã hóa)
     await new Promise((resolve, reject) => {
@@ -645,6 +651,144 @@ const authenticateToken = (req, res, next) => {
   console.log("Extracted Token:", token);
 };
 
+const sendResetPasswordCode = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required." });
+  }
+
+  try {
+    console.log("Email from request:", email);
+
+    // Kiểm tra email có tồn tại
+    const user = await new Promise((resolve, reject) => {
+      connection.query(
+        "SELECT * FROM users WHERE email = ?",
+        [email],
+        (err, results) => {
+          if (err) return reject(err);
+          resolve(results[0]); // Trả về user đầu tiên
+        }
+      );
+    });
+
+    console.log("User fetched from DB:", user);
+
+    if (!user) {
+      return res.status(404).json({ message: "Email not found." });
+    }
+
+    // Tạo mã reset và lưu vào DB
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiryTime = new Date(Date.now() + 15 * 60 * 1000); // 15 phút
+
+    await new Promise((resolve, reject) => {
+      connection.query(
+        "UPDATE users SET code = ?, code_expired_at = ? WHERE email = ?",
+        [resetCode, expiryTime, email],
+        (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        }
+      );
+    });
+
+    // Gửi email
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Password Reset Code",
+      html: compiledTemplate({
+        username: user.username,
+        resetCode: resetCode,
+        expiryMinutes: 15,
+      }),
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    console.log("User ID for response:", user.id);
+
+    return res.status(200).json({
+      message: "Reset code sent to email.",
+      data: {
+        userId: user.id,
+        timestamp: Date.now(),
+      },
+    });
+  } catch (error) {
+    console.error("Error sending reset password email:", error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { code, email, password } = req.body; // Lấy email, code, và mật khẩu mới từ request
+
+  // Kiểm tra đầu vào
+  if (!code || !email || !password) {
+    return res
+      .status(400)
+      .json({ message: "Email, code, and new password are required." });
+  }
+
+  try {
+    // Lấy thông tin người dùng từ database
+    const user = await new Promise((resolve, reject) => {
+      connection.query(
+        "SELECT * FROM users WHERE email = ?",
+        [email],
+        (err, results) => {
+          if (err) return reject(err);
+          resolve(results[0]);
+        }
+      );
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Kiểm tra mã reset và thời gian hết hạn
+    if (user.code !== code) {
+      return res.status(400).json({ message: "Invalid reset code." });
+    }
+
+    const currentTime = new Date();
+    const expiredTime = new Date(user.code_expired_at);
+
+    if (currentTime > expiredTime) {
+      return res.status(400).json({ message: "Reset code has expired." });
+    }
+
+    // Mã hóa mật khẩu mới
+    //const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Cập nhật mật khẩu mới và xóa mã reset
+    await new Promise((resolve, reject) => {
+      connection.query(
+        "UPDATE users SET password = ?, code = NULL, code_expired_at = NULL WHERE email = ?",
+        [password, email],
+        (err, results) => {
+          if (err) return reject(err);
+          resolve(results);
+        }
+      );
+    });
+
+    return res.status(200).json({
+      data: {
+        timestamp: Date.now(),
+      },
+      message: "Password has been reset successfully.",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
 module.exports = {
   account,
   login,
@@ -655,4 +799,6 @@ module.exports = {
   patchUserDetails,
   updatePassword,
   authenticateToken,
+  sendResetPasswordCode,
+  resetPassword,
 };
