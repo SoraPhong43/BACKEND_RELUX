@@ -7,6 +7,7 @@ const createMenusTable = () => {
               serviceId INT,
               name VARCHAR(255),
               description TEXT,
+              image VARCHAR(255),
               FOREIGN KEY (serviceId) REFERENCES services(serviceId)
             )
           `;

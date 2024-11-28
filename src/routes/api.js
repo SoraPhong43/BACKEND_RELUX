@@ -37,6 +37,11 @@ const {
   reverseGeocodeHandler,
   routeHandler,
 } = require("../controllers/mapController");
+const {
+  getAllMenu,
+  getMenuItemsByMenuId,
+  getPerMenuItem,
+} = require("../controllers/menuController");
 const router = express.Router();
 // user
 router.post("/auth/login", login);
@@ -64,7 +69,11 @@ router.post("/images/avatar", uploadAvatar);
 router.post("/services/service5star", getServices5star);
 router.post("/services/sericediscount", ServiceDiscount);
 router.post("/services/newservice", NewService);
-
+//menu
+router.post("/menu/allmenu", getAllMenu);
+router.post("/menu/menuById/:menuId", getMenuItemsByMenuId);
+router.post("/menuitem/permenuitem/:id", getPerMenuItem);
+//servicebyid
 router.get("/services/:serviceId", getServiceById);
 //category
 router.delete("/categories/:serviceId", deleteCategory);
@@ -79,4 +88,5 @@ router.get("/bookings/all", getAllBookings);
 router.get("/geocode", geocodeHandler);
 router.get("/reverse-geocode", reverseGeocodeHandler);
 router.get("/route", routeHandler);
+
 module.exports = router;

@@ -14,6 +14,7 @@ const createMenuItemsTable = () => {
       duration INT DEFAULT 0.00,
       status VARCHAR(50) DEFAULT 'Active', -- Thuộc tính đã thêm trực tiếp
       totalAmount DECIMAL(10, 2) DEFAULT 0.00, -- Thuộc tính đã thêm trực tiếp
+      image VARCHAR(255),
       FOREIGN KEY (menuId) REFERENCES menus(id)
     )
   `;
